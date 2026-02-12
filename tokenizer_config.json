@@ -1,0 +1,7 @@
+{
+  "tokenizer_class": "PaligemmaTokenizer",
+  "max_len": 200,
+  "auto_map": {
+    "AutoTokenizer": ["tokenizer_pi05.PaligemmaTokenizer", null]
+  }
+}
