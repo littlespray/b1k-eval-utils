@@ -1,12 +1,12 @@
 export ROOT_DIR=${ROOT_DIR:-/opt/eval}
 export OMNIGIBSON_HEADLESS=${OMNIGIBSON_HEADLESS:-1}
-export NUM_GPU=${NUM_GPU:-4}
+export NUM_GPU=${NUM_GPU:-1}
 export BASE_PORT=${BASE_PORT:-8000}
 export TASK_NAME=${TASK_NAME:-turning_on_radio}
 export LOG_PATH=${LOG_PATH:-${ROOT_DIR}/eval_output}
 mkdir -p $LOG_PATH
 
-TOTAL=10
+TOTAL=${TOTAL_TRIAL:-4}
 BASE=$((TOTAL / NUM_GPU))
 REM=$((TOTAL % NUM_GPU))
 
