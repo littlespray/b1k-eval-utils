@@ -4,7 +4,7 @@ export NUM_GPU=${NUM_GPU:-1}
 export BASE_PORT=${BASE_PORT:-8000}
 export TASK_NAME=${TASK_NAME:-turning_on_radio}
 export LOG_PATH=${LOG_PATH:-${ROOT_DIR}/eval_output}
-mkdir -p $LOG_PATH
+mkdir -p "$LOG_PATH"
 
 TOTAL=${TOTAL_TRIAL:-4}
 BASE=$((TOTAL / NUM_GPU))
@@ -14,8 +14,8 @@ for ((gpu=0; gpu<NUM_GPU; gpu++)); do
   s=$((gpu * BASE))
   e=$((s + BASE))
   [ "$gpu" -eq $((NUM_GPU - 1)) ] && e=$((e + REM))
-  CUDA_VISIBLE_DEVICES=$gpu \
-    python ${ROOT_DIR}/BEHAVIOR-1K/OmniGibson/omnigibson/learning/eval_custom.py \
+  CUDA_VISIBLE_DEVICES="$gpu" \
+    python "${ROOT_DIR}/BEHAVIOR-1K/OmniGibson/omnigibson/learning/eval_custom.py" \
       policy=websocket \
       task.name=$TASK_NAME \
       log_path=$LOG_PATH \
@@ -26,6 +26,6 @@ for ((gpu=0; gpu<NUM_GPU; gpu++)); do
       parallel_evaluator_start_idx=$s \
       parallel_evaluator_end_idx=$e \
       model.port=$((BASE_PORT + gpu)) \
-      > $LOG_PATH/${gpu}_stdout.log 2>&1 &
+      > "$LOG_PATH/${gpu}_stdout.log" 2>&1 &
 done
 wait
