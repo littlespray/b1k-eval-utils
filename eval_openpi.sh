@@ -7,8 +7,8 @@ PATH_TO_CKPT="${PATH_TO_CKPT:-/workspace/comet-pi05-b1k-pt50-ptm}"
 PORT="${PORT:-8000}"
 
 exec uv run scripts/serve_b1k.py \
-  --task_name="$TASK_NAME" \
+  --task_name "$TASK_NAME" \
+  --port "$PORT" \
   policy:checkpoint \
-  --policy.config="$CONFIG" \
-  --policy.dir="$PATH_TO_CKPT" \
-  "server.port=${PORT}"
+  --policy.config "$CONFIG" \
+  --policy.dir "$PATH_TO_CKPT"

@@ -10,6 +10,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3.10-dev python3-dev python3-distutils \
     libgl1 libglib2.0-0 libglu1-mesa \
     curl git ca-certificates \
+    tmux zip unzip vim \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv package manager
@@ -31,7 +32,7 @@ RUN mkdir -p ${EVAL_ROOT} \
 # Clone and setup openpi-comet
 SHELL ["/bin/bash", "-c"]
 RUN cd ${EVAL_ROOT} \
-    && git clone https://github.com/mli0603/openpi-comet.git \
+    && git clone https://github.com/mli0603/openpi-comet.git --depth=1 \
     && cd openpi-comet \
     && cp ${EVAL_ROOT}/b1k-eval-utils/eval_openpi.sh ${EVAL_ROOT}/openpi-comet/eval_openpi.sh \
     && cp ${EVAL_ROOT}/b1k-eval-utils/patch_comet_safetensors.sh ${EVAL_ROOT}/openpi-comet/patch_comet_safetensors.sh \
@@ -43,7 +44,7 @@ RUN cd ${EVAL_ROOT} \
 
 
 # Clone BEHAVIOR-1K and install bddl/OmniGibson into openpi-comet venv
-RUN git clone -b v3.7.2 --single-branch \
+RUN git clone -b v3.7.2 --single-branch --depth=1 \
     https://github.com/StanfordVL/BEHAVIOR-1K.git ${EVAL_ROOT}/BEHAVIOR-1K
 
 RUN cd ${EVAL_ROOT}/BEHAVIOR-1K \
@@ -65,16 +66,20 @@ RUN cd ${EVAL_ROOT}/BEHAVIOR-1K \
     && source /opt/miniconda3/etc/profile.d/conda.sh \
     && conda deactivate \
     && ./setup.sh --new-env --omnigibson --bddl --joylo --eval --primitives \
-        --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
+        --accept-conda-tos --accept-nvidia-eula \
+    && pip install scipy==1.11.4 \
+    && pip uninstall -y numpy \
+    && pip uninstall -y numpy \
+    && pip install numpy==1.26.4 opencv-contrib-python==4.10.0.84 \
 
-# ---------- debug: build with --build-arg STOP_BEFORE_DATASET=1 to stop here ----------
-# ARG STOP_BEFORE_DATASET=0
-# RUN if [ "$STOP_BEFORE_DATASET" = "1" ]; then echo "DEBUG: stopping before dataset step"; exit 0; fi \
-RUN cd ${EVAL_ROOT}/BEHAVIOR-1K \
-    && source /opt/miniconda3/etc/profile.d/conda.sh \
-    && conda activate behavior \
-    && pip install --force-reinstall numpy==1.26.4 scipy==1.11.4 opencv-contrib-python==4.10.0.84 \
-    && ./setup.sh --dataset --accept-dataset-tos
+
+
+# RUN cd ${EVAL_ROOT}/BEHAVIOR-1K \
+#     && source /opt/miniconda3/etc/profile.d/conda.sh \
+#     && conda activate behavior \
+#     && python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
+#     && python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=True)"
+#     && python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
 
 # Copy eval script
 RUN cp ${EVAL_ROOT}/b1k-eval-utils/eval_b1k.sh ${EVAL_ROOT}/BEHAVIOR-1K/eval_b1k.sh
@@ -93,11 +98,6 @@ RUN cp ${EVAL_ROOT}/b1k-eval-utils/eval_b1k.sh ${EVAL_ROOT}/BEHAVIOR-1K/eval_b1k
 
 RUN cd ${EVAL_ROOT} \
 && cp -r openpi-comet/src/behavior/learning/* BEHAVIOR-1K/OmniGibson/omnigibson/learning/
-
-# Convenience CLI tools
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    tmux zip unzip \
-    && rm -rf /var/lib/apt/lists/*
 
 # 
 ENV OPENPI_DATA_HOME=/opt/openpi-cache
