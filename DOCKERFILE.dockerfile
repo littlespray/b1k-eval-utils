@@ -66,11 +66,14 @@ RUN cd ${EVAL_ROOT}/BEHAVIOR-1K \
     && source /opt/miniconda3/etc/profile.d/conda.sh \
     && conda deactivate \
     && ./setup.sh --new-env --omnigibson --bddl --joylo --eval --primitives \
-        --accept-conda-tos --accept-nvidia-eula \
+        --accept-conda-tos --accept-nvidia-eula
+        
+RUN source /opt/miniconda3/etc/profile.d/conda.sh \
+    && conda activate behavior \
     && pip install scipy==1.11.4 \
     && pip uninstall -y numpy \
     && pip uninstall -y numpy \
-    && pip install numpy==1.26.4 opencv-contrib-python==4.10.0.84 \
+    && pip install numpy==1.26.4 opencv-contrib-python==4.10.0.84
 
 
 
