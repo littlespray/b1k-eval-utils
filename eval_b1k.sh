@@ -7,11 +7,16 @@ export LOG_PATH=${LOG_PATH:-${ROOT_DIR}/eval_output}
 mkdir -p "$LOG_PATH"
 
 TOTAL=${TOTAL_TRIAL:-4}
+GLOBAL_START_IDX=${EVAL_START_IDX:-0}
+if (( GLOBAL_START_IDX < 0 )); then
+  echo "EVAL_START_IDX must be >= 0"
+  exit 1
+fi
 BASE=$((TOTAL / NUM_GPU))
 REM=$((TOTAL % NUM_GPU))
 
 for ((gpu=0; gpu<NUM_GPU; gpu++)); do
-  s=$((gpu * BASE))
+  s=$((GLOBAL_START_IDX + gpu * BASE))
   e=$((s + BASE))
   [ "$gpu" -eq $((NUM_GPU - 1)) ] && e=$((e + REM))
   CUDA_VISIBLE_DEVICES="$gpu" \

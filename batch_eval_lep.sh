@@ -11,7 +11,10 @@ task_names=(
 gpu_per_task=5
 
 # Number of trials assigned to each GPU.
-trials_per_gpu=2
+trials_per_gpu=8
+
+# Number of unique episodes per task (wraps around when exceeded).
+episodes_per_task=10
 
 ckpt_basename="pt12-3w-comet2-20260204022222"
 
@@ -28,7 +31,9 @@ fi
 submitted_jobs=0
 
 for task_name in "${task_names[@]}"; do
-  for (( gpu_slot = 1; gpu_slot <= gpu_per_task; gpu_slot++ )); do
+  for (( gpu_slot = 0; gpu_slot < gpu_per_task; gpu_slot++ )); do
+    slot_offset=$(( (gpu_slot * trials_per_gpu) % episodes_per_task ))
+
     job_command="$(cat <<EOF
 export TASK_NAME="${task_name}"
 ckpt_basename="${ckpt_basename}"
@@ -36,6 +41,8 @@ export PATH_TO_CKPT=/tmp/\${ckpt_basename}
 export OPENPI_DATA_HOME=/opt/openpi-cache
 export NUM_GPU=1
 export TOTAL_TRIAL=${trials_per_gpu}
+export EVAL_START_IDX=${slot_offset}
+export EPISODES_PER_TASK=${episodes_per_task}
 export EVAL_ROOT=/opt/eval
 
 # prepare datasets

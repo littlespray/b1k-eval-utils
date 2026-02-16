@@ -9,6 +9,9 @@ CONDA_ENV="${CONDA_ENV:-behavior}"
 OPENPI_DATA_HOME="${OPENPI_DATA_HOME:-/opt/openpi-cache}"
 NUM_GPU="${NUM_GPU:-1}"
 BASE_PORT="${BASE_PORT:-8000}"
+TOTAL_TRIAL="${TOTAL_TRIAL:-10}"
+EVAL_START_IDX="${EVAL_START_IDX:-0}"
+EPISODES_PER_TASK="${EPISODES_PER_TASK:-10}"
 
 CKPT_NAME="$(basename "$PATH_TO_CKPT")"
 LOG_DIR="${LOG_DIR:-/opt/eval/eval_output/${TASK_NAME}_${CKPT_NAME}_$(date +%Y%m%d%H%M%S)}"
@@ -22,6 +25,7 @@ echo "[INFO] openpi_data_home=$OPENPI_DATA_HOME"
 echo "[INFO] logs=$LOG_DIR"
 echo "[INFO] num_gpu=$NUM_GPU"
 echo "[INFO] base_port=$BASE_PORT"
+echo "[INFO] total_trial=$TOTAL_TRIAL  eval_start_idx=$EVAL_START_IDX  episodes_per_task=$EPISODES_PER_TASK"
 
 OPENPI_PIDS=()
 
@@ -49,11 +53,33 @@ done
   conda activate "$CONDA_ENV"
   cd /opt/eval/BEHAVIOR-1K
   echo "[INFO] starting behavior eval..."
-  TASK_NAME="$TASK_NAME" \
-  LOG_PATH="$LOG_DIR" \
-  NUM_GPU="$NUM_GPU" \
-  BASE_PORT="$BASE_PORT" \
-    bash /opt/eval/BEHAVIOR-1K/eval_b1k.sh
+
+  _remaining=$TOTAL_TRIAL
+  _cursor=$EVAL_START_IDX
+
+  while (( _remaining > 0 )); do
+    if (( EPISODES_PER_TASK > 0 )); then
+      _s=$((_cursor % EPISODES_PER_TASK))
+      _chunk=$((EPISODES_PER_TASK - _s))
+      (( _chunk > _remaining )) && _chunk=$_remaining
+    else
+      _s=$_cursor
+      _chunk=$_remaining
+    fi
+
+    echo "[INFO] eval chunk: episodes ${_s}..$((_s + _chunk - 1)) (${_chunk} trials)"
+
+    TASK_NAME="$TASK_NAME" \
+    LOG_PATH="$LOG_DIR" \
+    NUM_GPU="$NUM_GPU" \
+    BASE_PORT="$BASE_PORT" \
+    EVAL_START_IDX="$_s" \
+    TOTAL_TRIAL="$_chunk" \
+      bash /opt/eval/BEHAVIOR-1K/eval_b1k.sh
+
+    _cursor=$((_cursor + _chunk))
+    _remaining=$((_remaining - _chunk))
+  done
 ) >"$LOG_DIR/behavior_eval.log" 2>&1 &
 B1K_PID=$!
 
