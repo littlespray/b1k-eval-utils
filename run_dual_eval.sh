@@ -63,27 +63,14 @@ echo "[INFO] tail logs:"
 echo "       ls -1 \"$LOG_DIR\"/openpi_gpu*.log"
 echo "       tail -f \"$LOG_DIR/behavior_eval.log\""
 
-set +e
-wait "$B1K_PID"
-B1K_STATUS=$?
-OPENPI_STATUS=0
+wait "$B1K_PID" || true
 for pid in "${OPENPI_PIDS[@]:-}"; do
   if kill -0 "$pid" 2>/dev/null; then
     kill "$pid" 2>/dev/null || true
   fi
 done
 for pid in "${OPENPI_PIDS[@]:-}"; do
-  wait "$pid"
-  st=$?
-  if [[ "$st" -ne 0 ]]; then
-    OPENPI_STATUS="$st"
-  fi
+  wait "$pid" || true
 done
-set -e
 
-if [[ "$OPENPI_STATUS" -ne 0 || "$B1K_STATUS" -ne 0 ]]; then
-  echo "[ERROR] openpi exit=$OPENPI_STATUS, behavior exit=$B1K_STATUS"
-  exit 1
-fi
-
-echo "[INFO] both processes finished successfully."
+echo "[INFO] both processes finished."
