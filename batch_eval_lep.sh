@@ -11,7 +11,7 @@ task_names=(
 gpu_per_task=5
 
 # Number of trials assigned to each GPU.
-trials_per_gpu=8
+trials_per_gpu=12
 
 # Number of unique episodes per task (wraps around when exceeded).
 episodes_per_task=10
@@ -60,6 +60,10 @@ mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos
 cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
 
 # run eval
+cd /opt/eval/b1k-eval-utils
+# git pull origin main
+# cp /opt/eval/b1k-eval-utils/run_dual_eval.sh /opt/eval/BEHAVIOR-1K/run_dual_eval.sh
+# cp /opt/eval/b1k-eval-utils/eval_openpi.sh /opt/eval/openpi-comet/eval_openpi.sh
 bash /opt/eval/b1k-eval-utils/run_dual_eval.sh
 
 # upload eval results
@@ -82,7 +86,7 @@ EOF
       --log-collection true \
       --queue-priority 9 \
       --can-preempt \
-      --name "${task_name}-${gpu_slot}"
+      --name "${task_name//_/-}-${gpu_slot}"
 
     submitted_jobs=$((submitted_jobs + 1))
   done
