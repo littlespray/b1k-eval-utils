@@ -1,51 +1,61 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-# Tasks to evaluate (each item maps to TASK_NAME in job command).
 task_names=(
   "turning_on_radio"
+  # "picking_up_trash"
+  # "picking_up_toys"
+  # "rearranging_kitchen_furniture"
+  # "putting_up_Christmas_decorations_inside"
+  # "sorting_vegetables"
+  # "putting_shoes_on_rack"
+  # "boxing_books_up_for_storage"
+  # "storing_food"
+  # "sorting_household_items"
+  # "wash_a_baseball_cap"
+  # "wash_dog_toys"
+  # "hanging_pictures"
+  # "attach_a_camera_to_a_tripod"
+  # "clean_a_trumpet"
+  # "spraying_for_bugs"
+  # "make_microwave_popcorn"
+  # "freeze_pies"
 )
 
-# Number of jobs created per task.
-gpu_per_task=5
-
-# Number of trials assigned to each GPU.
-trials_per_gpu=12
-
-# Number of unique episodes per task (wraps around when exceeded).
+node_per_task=2
+gpu_per_node=4
 episodes_per_task=10
+num_test_per_episode=2
+ckpt_basename="pi05-b1kpt12-cs32"
 
-ckpt_basename="pt12-3w-comet2-20260204022222"
+total_work=$((episodes_per_task * num_test_per_episode))
+base=$((total_work / node_per_task))
+rem=$((total_work % node_per_task))
 
-if (( gpu_per_task <= 0 )); then
-  echo "gpu_per_task must be > 0"
-  exit 1
-fi
-
-if (( trials_per_gpu <= 0 )); then
-  echo "trials_per_gpu must be > 0"
-  exit 1
-fi
-
-submitted_jobs=0
+submitted=0
 
 for task_name in "${task_names[@]}"; do
-  for (( gpu_slot = 0; gpu_slot < gpu_per_task; gpu_slot++ )); do
-    slot_offset=$(( (gpu_slot * trials_per_gpu) % episodes_per_task ))
+  for (( node = 0; node < node_per_task; node++ )); do
+    if (( node < rem )); then
+      node_trials=$((base + 1))
+      node_start=$((node * (base + 1)))
+    else
+      node_trials=$base
+      node_start=$((rem * (base + 1) + (node - rem) * base))
+    fi
 
     job_command="$(cat <<EOF
 export TASK_NAME="${task_name}"
-ckpt_basename="${ckpt_basename}"
-export PATH_TO_CKPT=/tmp/\${ckpt_basename}
+export CKPT_BASENAME="${ckpt_basename}"
+export PATH_TO_CKPT=/tmp/\${CKPT_BASENAME}
 export OPENPI_DATA_HOME=/opt/openpi-cache
-export NUM_GPU=1
-export TOTAL_TRIAL=${trials_per_gpu}
-export EVAL_START_IDX=${slot_offset}
 export EPISODES_PER_TASK=${episodes_per_task}
-export EVAL_ROOT=/opt/eval
+export EVAL_START=${node_start}
+export EVAL_COUNT=${node_trials}
+export NUM_GPU=${gpu_per_node}
 
-# prepare datasets
+EVAL_ROOT=/opt/eval
+
 cd \${EVAL_ROOT}/BEHAVIOR-1K
 source /opt/miniconda3/etc/profile.d/conda.sh
 conda activate behavior
@@ -54,29 +64,23 @@ python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets;
 python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
 conda deactivate
 
-# prepare ckpt
-hf download shangkuns/\${ckpt_basename} --local-dir \${PATH_TO_CKPT}
+hf download shangkuns/\${CKPT_BASENAME} --local-dir \${PATH_TO_CKPT}
 mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos
 cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
 
-# run eval
-cd /opt/eval/b1k-eval-utils
-# git pull origin main
-# cp /opt/eval/b1k-eval-utils/run_dual_eval.sh /opt/eval/BEHAVIOR-1K/run_dual_eval.sh
-# cp /opt/eval/b1k-eval-utils/eval_openpi.sh /opt/eval/openpi-comet/eval_openpi.sh
-bash /opt/eval/b1k-eval-utils/run_dual_eval.sh
+cd \${EVAL_ROOT}/b1k-eval-utils
+bash patch_walltime.sh \${EVAL_ROOT}/BEHAVIOR-1K/OmniGibson/omnigibson/learning
+bash run_dual_eval.sh
 
-# upload eval results
-hf upload shangkuns/\${ckpt_basename} /opt/eval/eval_output \${TASK_NAME} --repo-type dataset
-
+hf upload shangkuns/\${CKPT_BASENAME} /opt/eval/eval_output \${TASK_NAME} --repo-type dataset
 EOF
 )"
 
     lep job create \
-      --resource-shape my.1xl40s \
+      --resource-shape "my.${gpu_per_node}xl40s" \
       --node-group oci-ord-lepton-001 \
       --num-workers 1 \
-      --container-image littlespray/b1k-eval-light:v3 \
+      --container-image littlespray/b1k-eval-light:v4 \
       --command "${job_command}" \
       --intra-job-communication=true \
       --env NVIDIA_DRIVER_CAPABILITIES=all \
@@ -84,12 +88,12 @@ EOF
       --secret HUGGING_FACE_HUB_TOKEN=SHANGKUN_HF_NV.shangkuns \
       --ttl-seconds-after-finished 259200 \
       --log-collection true \
-      --queue-priority 9 \
+      --queue-priority 8 \
       --can-preempt \
-      --name "${task_name//_/-}-${gpu_slot}"
+      --name "${task_name//_/-}-n${node}"
 
-    submitted_jobs=$((submitted_jobs + 1))
+    submitted=$((submitted + 1))
   done
 done
 
-echo "Submitted ${submitted_jobs} lep jobs."
+echo "Submitted ${submitted} jobs."
