@@ -24,7 +24,7 @@ task_names=(
 
 node_per_task=5
 num_test_per_episode=2
-ckpt_basename="pi05-b1kpt12-cs32"
+ckpt_name="pi05-b1kpt12-cs32"
 gpu_per_node=4
 episodes_per_task=10
 
@@ -46,9 +46,9 @@ for task_name in "${task_names[@]}"; do
 
     job_command="$(cat <<EOF
 export TASK_NAME="${task_name}"
-export CKPT_BASENAME="${ckpt_basename}"
+export CKPT_NAME="${ckpt_name}"
 export NODE_ID="${node}"
-export PATH_TO_CKPT=/tmp/\${CKPT_BASENAME}
+export PATH_TO_CKPT=/tmp/\${CKPT_NAME}
 export OPENPI_DATA_HOME=/opt/openpi-cache
 export EPISODES_PER_TASK=${episodes_per_task}
 export EVAL_START=${node_start}
@@ -71,7 +71,7 @@ python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets;
 python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
 conda deactivate
 
-hf download shangkuns/\${CKPT_BASENAME} --local-dir \${PATH_TO_CKPT}
+hf download shangkuns/\${CKPT_NAME} --local-dir \${PATH_TO_CKPT}
 mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos
 cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
 
@@ -87,7 +87,7 @@ cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior
 bash \${EVAL_ROOT}/b1k-eval-utils/patch_walltime.sh \${EVAL_ROOT}/BEHAVIOR-1K/OmniGibson/omnigibson/learning
 bash run_dual_eval.sh
 
-hf upload shangkuns/\${CKPT_BASENAME} /opt/eval/eval_output \${TASK_NAME} --repo-type dataset
+hf upload shangkuns/\${CKPT_NAME} /opt/eval/eval_output \${TASK_NAME} --repo-type dataset
 EOF
 )"
 
