@@ -22,11 +22,11 @@ task_names=(
   # "freeze_pies"
 )
 
-node_per_task=2
-gpu_per_node=4
-episodes_per_task=10
+node_per_task=5
 num_test_per_episode=2
 ckpt_basename="pi05-b1kpt12-cs32"
+gpu_per_node=4
+episodes_per_task=10
 
 total_work=$((episodes_per_task * num_test_per_episode))
 base=$((total_work / node_per_task))
@@ -47,6 +47,7 @@ for task_name in "${task_names[@]}"; do
     job_command="$(cat <<EOF
 export TASK_NAME="${task_name}"
 export CKPT_BASENAME="${ckpt_basename}"
+export NODE_ID="${node}"
 export PATH_TO_CKPT=/tmp/\${CKPT_BASENAME}
 export OPENPI_DATA_HOME=/opt/openpi-cache
 export EPISODES_PER_TASK=${episodes_per_task}
@@ -57,6 +58,12 @@ export NUM_GPU=${gpu_per_node}
 EVAL_ROOT=/opt/eval
 
 cd \${EVAL_ROOT}/BEHAVIOR-1K
+
+# prepare b1k env
+mkdir -p /opt/miniconda3/envs/behavior
+hf download shangkuns/b1k-behavior-env behavior-env.tar --local-dir /tmp/hf-cache
+tar xf /tmp/hf-cache/behavior-env.tar -C /opt/miniconda3/envs/behavior
+
 source /opt/miniconda3/etc/profile.d/conda.sh
 conda activate behavior
 python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
@@ -68,8 +75,16 @@ hf download shangkuns/\${CKPT_BASENAME} --local-dir \${PATH_TO_CKPT}
 mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos
 cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
 
-cd \${EVAL_ROOT}/b1k-eval-utils
-bash patch_walltime.sh \${EVAL_ROOT}/BEHAVIOR-1K/OmniGibson/omnigibson/learning
+rm -rf \${EVAL_ROOT}/b1k-eval-utils
+hf download shangkuns/b1k-eval-utils --local-dir \${EVAL_ROOT}/b1k-eval-utils
+cp \${EVAL_ROOT}/b1k-eval-utils/run_dual_eval.sh /opt/eval/BEHAVIOR-1K/run_dual_eval.sh
+cp \${EVAL_ROOT}/b1k-eval-utils/eval_b1k.sh /opt/eval/BEHAVIOR-1K/eval_b1k.sh
+cp \${EVAL_ROOT}/b1k-eval-utils/eval_openpi.sh /opt/eval/openpi-comet/eval_openpi.sh
+
+mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
+cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
+
+bash \${EVAL_ROOT}/b1k-eval-utils/patch_walltime.sh \${EVAL_ROOT}/BEHAVIOR-1K/OmniGibson/omnigibson/learning
 bash run_dual_eval.sh
 
 hf upload shangkuns/\${CKPT_BASENAME} /opt/eval/eval_output \${TASK_NAME} --repo-type dataset
@@ -90,7 +105,7 @@ EOF
       --log-collection true \
       --queue-priority 8 \
       --can-preempt \
-      --name "${task_name//_/-}-n${node}"
+      --name "$(printf '%s-n%s' "$task_name" "$node" | tr '[:upper:]_' '[:lower:]-' | tail -c 36)"
 
     submitted=$((submitted + 1))
   done

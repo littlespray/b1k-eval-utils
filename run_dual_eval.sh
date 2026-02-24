@@ -13,8 +13,12 @@ EVAL_COUNT="${EVAL_COUNT:-10}"
 NUM_GPU="${NUM_GPU:-1}"
 
 
-LOG_DIR="${LOG_DIR:-/opt/eval/eval_output}"
-mkdir -p "$OPENPI_DATA_HOME" "$LOG_DIR"
+NODE_ID="${NODE_ID:-0}"
+CKPT_NAME="${CKPT_NAME:-ckpt}"
+TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+LOG_BASE="/opt/eval/eval_output"
+LOG_PREFIX="${TASK_NAME}_${CKPT_NAME}_node${NODE_ID}"
+mkdir -p "$OPENPI_DATA_HOME" "$LOG_BASE"
 export OPENPI_DATA_HOME
 
 echo "[INFO] task=$TASK_NAME gpus=$NUM_GPU eval_start=$EVAL_START eval_count=$EVAL_COUNT"
@@ -29,7 +33,7 @@ for ((gpu = 0; gpu < NUM_GPU; gpu++)); do
     PATH_TO_CKPT="$PATH_TO_CKPT" \
     PORT="$((BASE_PORT + gpu))" \
       bash /opt/eval/openpi-comet/eval_openpi.sh
-  ) >"$LOG_DIR/openpi_gpu${gpu}.log" 2>&1 &
+  ) >"$LOG_BASE/${LOG_PREFIX}_gpu${gpu}_openpi.log" 2>&1 &
   OPENPI_PIDS+=("$!")
 done
 
@@ -41,26 +45,32 @@ done
 
   _remaining=$EVAL_COUNT
   _cursor=$EVAL_START
+  _round=0
 
   while (( _remaining > 0 )); do
     _s=$((_cursor % EPISODES_PER_TASK))
     _chunk=$((EPISODES_PER_TASK - _s))
     (( _chunk > _remaining )) && _chunk=$_remaining
 
-    echo "[INFO] eval chunk: episodes ${_s}..$((_s + _chunk - 1)) (${_chunk} trials)"
+    echo "[INFO] eval round=${_round}: episodes ${_s}..$((_s + _chunk - 1)) (${_chunk} trials)"
 
     TASK_NAME="$TASK_NAME" \
-    LOG_PATH="$LOG_DIR" \
+    CKPT_NAME="$CKPT_NAME" \
+    LOG_BASE="$LOG_BASE" \
+    TIMESTAMP="$TIMESTAMP" \
     NUM_GPU="$NUM_GPU" \
     BASE_PORT="$BASE_PORT" \
     EVAL_START_IDX="$_s" \
     EVAL_COUNT="$_chunk" \
+    EVAL_ROUND="$_round" \
+    NODE_ID="$NODE_ID" \
       bash /opt/eval/BEHAVIOR-1K/eval_b1k.sh
 
     _cursor=$((_cursor + _chunk))
     _remaining=$((_remaining - _chunk))
+    _round=$((_round + 1))
   done
-) >"$LOG_DIR/behavior_eval.log" 2>&1 &
+) >"$LOG_BASE/${LOG_PREFIX}_behavior_eval.log" 2>&1 &
 B1K_PID=$!
 
 wait "$B1K_PID" || true
