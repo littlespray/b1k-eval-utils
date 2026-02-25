@@ -6,26 +6,20 @@ export TASK_NAME=${TASK_NAME:-turning_on_radio}
 export CKPT_NAME=${CKPT_NAME:-ckpt}
 export LOG_BASE=${LOG_BASE:-${ROOT_DIR}/eval_output}
 export TIMESTAMP=${TIMESTAMP:-$(date +%Y%m%d%H%M%S)}
+export EPISODES_PER_TASK=${EPISODES_PER_TASK:-10}
 mkdir -p "$LOG_BASE"
 
 TOTAL=${EVAL_COUNT:-4}
-START=${EVAL_START_IDX:-0}
+START=${EVAL_START:-0}
+NODE=${NODE_ID:-0}
+ROUND=${EVAL_ROUND:-0}
 
-BASE=$((TOTAL / NUM_GPU))
-REM=$((TOTAL % NUM_GPU))
+# Each GPU gets one trial in this round (TOTAL <= NUM_GPU per round)
+for ((gpu = 0; gpu < TOTAL; gpu++)); do
+  # Calculate episode index with wrap-around
+  trial_idx=$((START + gpu))
+  episode_idx=$((trial_idx % EPISODES_PER_TASK))
 
-for ((gpu = 0; gpu < NUM_GPU; gpu++)); do
-  if ((gpu < REM)); then
-    count=$((BASE + 1))
-    s=$((START + gpu * (BASE + 1)))
-  else
-    count=$BASE
-    s=$((START + REM * (BASE + 1) + (gpu - REM) * BASE))
-  fi
-  (( count == 0 )) && continue
-
-  ROUND=${EVAL_ROUND:-0}
-  NODE=${NODE_ID:-0}
   GPU_LOG_PATH="$LOG_BASE/${TASK_NAME}_${CKPT_NAME}_node${NODE}_gpu${gpu}_round${ROUND}_${TIMESTAMP}"
   mkdir -p "$GPU_LOG_PATH"
 
@@ -38,8 +32,8 @@ for ((gpu = 0; gpu < NUM_GPU; gpu++)); do
       save_rollout=false \
       perturb_pose=false \
       use_parallel_evaluator=true \
-      parallel_evaluator_start_idx=$s \
-      parallel_evaluator_end_idx=$((s + count)) \
+      parallel_evaluator_start_idx=$episode_idx \
+      parallel_evaluator_end_idx=$((episode_idx + 1)) \
       model.port=$((BASE_PORT + gpu)) \
       >> "$GPU_LOG_PATH/stdout.log" 2>&1 &
 done

@@ -23,8 +23,24 @@ export OPENPI_DATA_HOME
 
 echo "[INFO] task=$TASK_NAME gpus=$NUM_GPU eval_start=$EVAL_START eval_count=$EVAL_COUNT"
 
-# Launch one openpi policy server per GPU
 OPENPI_PIDS=()
+B1K_PID=""
+
+cleanup() {
+  echo "[INFO] cleanup: killing background processes …"
+  if [[ -n "$B1K_PID" ]]; then
+    kill "$B1K_PID" 2>/dev/null || true
+    wait "$B1K_PID" 2>/dev/null || true
+  fi
+  for pid in "${OPENPI_PIDS[@]}"; do
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+  echo "[INFO] cleanup: done."
+}
+trap cleanup EXIT INT TERM HUP
+
+# Launch one openpi policy server per GPU
 for ((gpu = 0; gpu < NUM_GPU; gpu++)); do
   (
     cd /opt/eval/openpi-comet
@@ -43,16 +59,23 @@ done
   conda activate "$CONDA_ENV"
   cd /opt/eval/BEHAVIOR-1K
 
-  _remaining=$EVAL_COUNT
-  _cursor=$EVAL_START
-  _round=0
+  echo "[INFO] eval: start=${EVAL_START}, count=${EVAL_COUNT}, num_gpu=${NUM_GPU}"
 
-  while (( _remaining > 0 )); do
-    _s=$((_cursor % EPISODES_PER_TASK))
-    _chunk=$((EPISODES_PER_TASK - _s))
-    (( _chunk > _remaining )) && _chunk=$_remaining
+  # Calculate total rounds needed (each round uses all GPUs in parallel)
+  total_rounds=$(( (EVAL_COUNT + NUM_GPU - 1) / NUM_GPU ))
 
-    echo "[INFO] eval round=${_round}: episodes ${_s}..$((_s + _chunk - 1)) (${_chunk} trials)"
+  for (( round = 0; round < total_rounds; round++ )); do
+    # Calculate this round's trial range
+    round_offset=$((round * NUM_GPU))
+    round_start=$((EVAL_START + round_offset))
+    remaining=$((EVAL_COUNT - round_offset))
+    if (( remaining > NUM_GPU )); then
+      round_count=$NUM_GPU
+    else
+      round_count=$remaining
+    fi
+
+    echo "[INFO] round=${round}: trials ${round_start}..$(( round_start + round_count - 1 )) (${round_count} trials)"
 
     TASK_NAME="$TASK_NAME" \
     CKPT_NAME="$CKPT_NAME" \
@@ -60,23 +83,16 @@ done
     TIMESTAMP="$TIMESTAMP" \
     NUM_GPU="$NUM_GPU" \
     BASE_PORT="$BASE_PORT" \
-    EVAL_START_IDX="$_s" \
-    EVAL_COUNT="$_chunk" \
-    EVAL_ROUND="$_round" \
+    EVAL_START="$round_start" \
+    EVAL_COUNT="$round_count" \
+    EPISODES_PER_TASK="$EPISODES_PER_TASK" \
+    EVAL_ROUND="$round" \
     NODE_ID="$NODE_ID" \
       bash /opt/eval/BEHAVIOR-1K/eval_b1k.sh
-
-    _cursor=$((_cursor + _chunk))
-    _remaining=$((_remaining - _chunk))
-    _round=$((_round + 1))
   done
 ) >"$LOG_BASE/${LOG_PREFIX}_behavior_eval.log" 2>&1 &
 B1K_PID=$!
 
 wait "$B1K_PID" || true
-for pid in "${OPENPI_PIDS[@]}"; do
-  kill "$pid" 2>/dev/null || true
-  wait "$pid" || true
-done
 
 echo "[INFO] done."
