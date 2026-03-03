@@ -22,8 +22,8 @@ task_names=(
   # "freeze_pies"
 )
 
-node_per_task=5
-num_test_per_episode=2
+node_per_task=1
+num_test_per_episode=1
 ckpt_name="pi05-b1kpt12-cs32"
 gpu_per_node=4
 episodes_per_task=10
@@ -54,6 +54,8 @@ export EPISODES_PER_TASK=${episodes_per_task}
 export EVAL_START=${node_start}
 export EVAL_COUNT=${node_trials}
 export NUM_GPU=${gpu_per_node}
+
+apt-get install -y libxt6
 
 EVAL_ROOT=/opt/eval
 
@@ -102,6 +104,7 @@ EOF
       --env DEBIAN_FRONTEND=noninteractive \
       --secret HUGGING_FACE_HUB_TOKEN=SHANGKUN_HF_NV.shangkuns \
       --ttl-seconds-after-finished 259200 \
+      --shared-memory-size 786432 \
       --log-collection true \
       --queue-priority 8 \
       --can-preempt \

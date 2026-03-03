@@ -23,18 +23,24 @@ for ((gpu = 0; gpu < TOTAL; gpu++)); do
   GPU_LOG_PATH="$LOG_BASE/${TASK_NAME}_${CKPT_NAME}_node${NODE}_gpu${gpu}_round${ROUND}_${TIMESTAMP}"
   mkdir -p "$GPU_LOG_PATH"
 
-  CUDA_VISIBLE_DEVICES="$gpu" \
-    python "${ROOT_DIR}/BEHAVIOR-1K/OmniGibson/omnigibson/learning/eval_custom.py" \
-      policy=websocket \
-      task.name=$TASK_NAME \
-      log_path=$GPU_LOG_PATH \
-      env_wrapper._target_=omnigibson.learning.wrappers.RGBWrapper \
-      save_rollout=false \
-      perturb_pose=false \
-      use_parallel_evaluator=true \
-      parallel_evaluator_start_idx=$episode_idx \
-      parallel_evaluator_end_idx=$((episode_idx + 1)) \
-      model.port=$((BASE_PORT + gpu)) \
-      >> "$GPU_LOG_PATH/stdout.log" 2>&1 &
+  (
+    # Add a small delay between GPU starts to avoid race conditions in extension loading
+    if (( gpu > 0 )); then
+      sleep $(( gpu * 5 ))
+    fi
+
+    OMNIGIBSON_GPU_ID="$gpu" \
+      python "${ROOT_DIR}/BEHAVIOR-1K/OmniGibson/omnigibson/learning/eval_custom.py" \
+        policy=websocket \
+        task.name=$TASK_NAME \
+        log_path=$GPU_LOG_PATH \
+        env_wrapper._target_=omnigibson.learning.wrappers.RGBWrapper \
+        save_rollout=false \
+        perturb_pose=false \
+        use_parallel_evaluator=true \
+        parallel_evaluator_start_idx=$episode_idx \
+        parallel_evaluator_end_idx=$((episode_idx + 1)) \
+        model.port=$((BASE_PORT + gpu))
+  ) >> "$GPU_LOG_PATH/stdout.log" 2>&1 &
 done
 wait
