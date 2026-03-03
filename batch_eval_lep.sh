@@ -24,7 +24,7 @@ task_names=(
 
 node_per_task=1
 num_test_per_episode=1
-ckpt_name="pi05-b1kpt12-cs32"
+ckpt_name="pi05-b1kpt12-cs32-jax"
 gpu_per_node=4
 episodes_per_task=10
 

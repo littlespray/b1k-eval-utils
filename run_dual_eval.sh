@@ -45,6 +45,7 @@ for ((gpu = 0; gpu < NUM_GPU; gpu++)); do
   (
     cd /opt/eval/openpi-comet
     CUDA_VISIBLE_DEVICES="$gpu" \
+    XLA_PYTHON_CLIENT_PREALLOCATE=false \
     TASK_NAME="$TASK_NAME" \
     PATH_TO_CKPT="$PATH_TO_CKPT" \
     PORT="$((BASE_PORT + gpu))" \
