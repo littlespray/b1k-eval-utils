@@ -2,29 +2,25 @@
 set -euo pipefail
 
 task_names=(
-  "turning_on_radio"
-  # "picking_up_trash"
-  # "picking_up_toys"
-  # "rearranging_kitchen_furniture"
-  # "putting_up_Christmas_decorations_inside"
-  # "sorting_vegetables"
-  # "putting_shoes_on_rack"
-  # "boxing_books_up_for_storage"
-  # "storing_food"
-  # "sorting_household_items"
-  # "wash_a_baseball_cap"
-  # "wash_dog_toys"
-  # "hanging_pictures"
-  # "attach_a_camera_to_a_tripod"
-  # "clean_a_trumpet"
-  # "spraying_for_bugs"
-  # "make_microwave_popcorn"
-  # "freeze_pies"
+"turning_on_radio"
+"picking_up_trash"
+"hiding_Easter_eggs"
+"wash_a_baseball_cap"
+"hanging_pictures"
+"attach_a_camera_to_a_tripod"
+"make_microwave_popcorn"
+"bringing_water"
+"tidying_bedroom"
+"putting_shoes_on_rack"
+"setting_the_fire"
+"cook_hot_dogs"
 )
 
-node_per_task=1
-num_test_per_episode=1
-ckpt_name="pi05-b1kpt12-cs32-jax"
+node_per_task=5
+num_test_per_episode=2
+# ckpt_name="pt12-2w-comet2-refactor-20260213065325"
+# ckpt_name="pi05-b1kpt12-cs32"
+ckpt_name="pt12-comet-5w-comet4-b1knorm-20260309094349"
 gpu_per_node=4
 episodes_per_task=10
 
@@ -74,8 +70,6 @@ python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task
 conda deactivate
 
 hf download shangkuns/\${CKPT_NAME} --local-dir \${PATH_TO_CKPT}
-mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos
-cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
 
 rm -rf \${EVAL_ROOT}/b1k-eval-utils
 hf download shangkuns/b1k-eval-utils --local-dir \${EVAL_ROOT}/b1k-eval-utils
@@ -83,8 +77,8 @@ cp \${EVAL_ROOT}/b1k-eval-utils/run_dual_eval.sh /opt/eval/BEHAVIOR-1K/run_dual_
 cp \${EVAL_ROOT}/b1k-eval-utils/eval_b1k.sh /opt/eval/BEHAVIOR-1K/eval_b1k.sh
 cp \${EVAL_ROOT}/b1k-eval-utils/eval_openpi.sh /opt/eval/openpi-comet/eval_openpi.sh
 
-mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
-cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/
+mkdir -p \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos
+cp \${EVAL_ROOT}/b1k-eval-utils/norm_stats.json \${PATH_TO_CKPT}/assets/behavior-1k/2025-challenge-demos/norm_stats.json
 
 bash \${EVAL_ROOT}/b1k-eval-utils/patch_walltime.sh \${EVAL_ROOT}/BEHAVIOR-1K/OmniGibson/omnigibson/learning
 bash run_dual_eval.sh
@@ -106,7 +100,7 @@ EOF
       --ttl-seconds-after-finished 259200 \
       --shared-memory-size 786432 \
       --log-collection true \
-      --queue-priority 8 \
+      --queue-priority 7 \
       --can-preempt \
       --name "$(printf '%s-n%s' "$task_name" "$node" | tr '[:upper:]_' '[:lower:]-' | tail -c 36)"
 
